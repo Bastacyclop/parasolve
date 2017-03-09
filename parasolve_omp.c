@@ -7,6 +7,7 @@ unsigned long long int node_searched = 0;
 
 void evaluate(tree_t * T, result_t *result)
 {
+    #pragma omp atomic
     node_searched++;
   
     move_t moves[MAX_MOVES];
@@ -18,9 +19,6 @@ void evaluate(tree_t * T, result_t *result)
     if (test_draw_or_victory(T, result))
         return;
 
-    if (TRANSPOSITION_TABLE && tt_lookup(T, result))     /* la réponse est-elle déjà connue ? */
-        return;
-        
     compute_attack_squares(T);
 
     /* profondeur max atteinte ? si oui, évaluation heuristique */
@@ -37,37 +35,31 @@ void evaluate(tree_t * T, result_t *result)
         return;
     }
         
-    if (ALPHA_BETA_PRUNING)
-        sort_moves(T, n_moves, moves);
-
     /* évalue récursivement les positions accessibles à partir d'ici */
     for (int i = 0; i < n_moves; i++) {
-        tree_t child;
-        result_t child_result;
-                
-        play_move(T, moves[i], &child);
-                
-        evaluate(&child, &child_result);
-                         
-        int child_score = -child_result.score;
-
-        if (child_score > result->score) {
-            result->score = child_score;
-            result->best_move = moves[i];
-            result->pv_length = child_result.pv_length + 1;
-            for(int j = 0; j < child_result.pv_length; j++)
-                result->PV[j+1] = child_result.PV[j];
-            result->PV[0] = moves[i];
+        #pragma omp task
+        {
+            tree_t child;
+            result_t child_result;
+            
+            play_move(T, moves[i], &child);
+            evaluate(&child, &child_result);
+            
+            int child_score = -child_result.score;
+            
+            #pragma omp critical
+            if (child_score > result->score) {
+                result->score = child_score;
+                result->best_move = moves[i];
+                result->pv_length = child_result.pv_length + 1;
+                for(int j = 0; j < child_result.pv_length; j++)
+                    result->PV[j+1] = child_result.PV[j];
+                result->PV[0] = moves[i];
+            }
         }
-
-        if (ALPHA_BETA_PRUNING && child_score >= T->beta)
-            break;    
-
-        T->alpha = MAX(T->alpha, child_score);
     }
 
-    if (TRANSPOSITION_TABLE)
-        tt_store(T, result);
+    #pragma omp taskwait
 }
 
 
@@ -80,6 +72,8 @@ void decide(tree_t * T, result_t *result)
         T->beta = MAX_SCORE + 1;
 
         printf("=====================================\n");
+        #pragma omp parallel
+        #pragma omp single
         evaluate(T, result);
 
         printf("depth: %d / score: %.2f / best_move : ", T->depth, 0.01 * result->score);

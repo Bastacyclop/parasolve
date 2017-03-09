@@ -1,5 +1,6 @@
 #include "projet.h"
 #include <mpi.h>
+#include <time.h>
 
 unsigned long long int node_searched = 0;
 
@@ -255,6 +256,8 @@ int main(int argc, char **argv) {
     commit_tree_datatype(&e.tree_type);
     commit_result_datatype(&e.result_type);
 
+    time_t marker = time(NULL);
+
     if (e.rank == 0) {
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
@@ -308,6 +311,8 @@ int main(int argc, char **argv) {
         }
         printf("worker %i down, searched %llu nodes\n", e.rank, node_searched);
     }
+
+    printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);
   
     MPI_Finalize();
     return EXIT_SUCCESS;
