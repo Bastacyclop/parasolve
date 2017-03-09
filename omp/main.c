@@ -8,7 +8,7 @@ unsigned long long int node_searched = 0;
 
 void evaluate(tree_t * T, result_t *result)
 {
-    #pragma omp atomic
+#pragma omp atomic
     node_searched++;
   
     move_t moves[MAX_MOVES];

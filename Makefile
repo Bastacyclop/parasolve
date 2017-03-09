@@ -1,20 +1,14 @@
-target: decide
+target: all
 
-CFLAGS= -g -O3 -std=c99 -Wall
-
-aux.o: aux.c projet.h
-
-parasolve_mpi: parasolve_mpi.c aux.o
-	mpicc $(CFLAGS) $^ -o $@
-
-parasolve_omp: parasolve_omp.c aux.o
-	$(CC) $(CFLAGS) -fopenmp $^ -o $@
-
-main.o: main.c projet.h
-decide: main.o aux.o
-	$(CC) $(CFLAGS) $^ -o $@
+all:
+	cd seq && make
+	cd mpi && make
+	cd omp && make
+	cd mpi_omp && make
 
 .PHONY: clean
 clean:
-	rm -f *.o decide parasolve_mpi parasolve_omp
-
+	cd seq && make clean
+	cd mpi && make clean
+	cd omp && make clean
+	cd mpi_omp && make clean
