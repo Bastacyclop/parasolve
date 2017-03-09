@@ -4,6 +4,7 @@
 /* 2017-02-23 : version 1.0 */
 
 unsigned long long int node_searched = 0;
+#define TASK_DEPTH 3
 
 void evaluate(tree_t * T, result_t *result)
 {
@@ -34,20 +35,43 @@ void evaluate(tree_t * T, result_t *result)
         result->score = check(T) ? -MAX_SCORE : CERTAIN_DRAW;
         return;
     }
-        
-    /* évalue récursivement les positions accessibles à partir d'ici */
-    for (int i = 0; i < n_moves; i++) {
-        #pragma omp task
-        {
+
+    if (T->height <= TASK_DEPTH) {
+        for (int i = 0; i < n_moves; i++) {
+#pragma omp task
+            {
+                tree_t child;
+                result_t child_result;
+
+                play_move(T, moves[i], &child);
+                evaluate(&child, &child_result);
+
+                int child_score = -child_result.score;
+
+#pragma omp critical
+                {
+                    if (child_score > result->score) {
+                        result->score = child_score;
+                        result->best_move = moves[i];
+                        result->pv_length = child_result.pv_length + 1;
+                        for(int j = 0; j < child_result.pv_length; j++)
+                            result->PV[j+1] = child_result.PV[j];
+                        result->PV[0] = moves[i];
+                    }
+                }
+            }
+        }
+#pragma omp taskwait
+    } else {
+        for (int i = 0; i < n_moves; i++) {
             tree_t child;
             result_t child_result;
-            
+
             play_move(T, moves[i], &child);
             evaluate(&child, &child_result);
-            
+
             int child_score = -child_result.score;
-            
-            #pragma omp critical
+
             if (child_score > result->score) {
                 result->score = child_score;
                 result->best_move = moves[i];
@@ -58,8 +82,6 @@ void evaluate(tree_t * T, result_t *result)
             }
         }
     }
-
-    #pragma omp taskwait
 }
 
 
