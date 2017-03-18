@@ -4,7 +4,7 @@
 /* 2017-02-23 : version 1.0 */
 
 unsigned long long int node_searched = 0;
-#define TASK_DEPTH 3
+int task_depth = 3;
 
 void evaluate(tree_t * T, result_t *result)
 {
@@ -36,7 +36,7 @@ void evaluate(tree_t * T, result_t *result)
         return;
     }
 
-    if (T->height <= TASK_DEPTH) {
+    if (T->height <= task_depth) {
         for (int i = 0; i < n_moves; i++) {
 #pragma omp task
             {
@@ -94,8 +94,8 @@ void decide(tree_t * T, result_t *result)
         T->beta = MAX_SCORE + 1;
 
         printf("=====================================\n");
-        #pragma omp parallel
-        #pragma omp single
+#pragma omp parallel
+#pragma omp single
         evaluate(T, result);
 
         printf("depth: %d / score: %.2f / best_move : ", T->depth, 0.01 * result->score);
@@ -128,6 +128,10 @@ int main(int argc, char **argv)
         
     parse_FEN(argv[1], &root);
     print_position(&root);
+
+    if (argc >= 3) {
+        task_depth = atoi(argv[2]);
+    }
         
     decide(&root, &result);
 

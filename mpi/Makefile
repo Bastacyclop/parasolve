@@ -8,7 +8,7 @@ decide: main.c aux.o
 	mpicc $(CFLAGS) $^ -o $@
 
 exec: decide
-	mpirun -n 5 ./decide "/ppp//PPP//7k//7K w"
+	mpirun -n 4 ./decide "/ppp//PPP//7k//7K w"
 
 .PHONY: clean
 clean:

@@ -3,8 +3,7 @@
 #include <time.h>
 
 unsigned long long int node_searched = 0;
-
-#define TASK_DEPTH 3
+int task_depth = 3;
 
 const int TAG_DATA = 0;
 const int TAG_TASK = 1;
@@ -52,7 +51,8 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
     if (ALPHA_BETA_PRUNING)
         sort_moves(T, n_moves, moves);
 
-    if (env->rank == 0 && n_moves >= (env->procs - 1)) {
+    if (env->rank == 0) {
+        // here T->height == 0
         printf("delegating %i moves\n", n_moves);
         move_t* pmoves = malloc((env->procs - 1) * sizeof(move_t));
 
@@ -91,6 +91,32 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
                 *pm = moves[m];
             }
         }
+    } else if (T->height <= task_depth) {
+        for (int i = 0; i < n_moves; i++) {
+#pragma omp task
+            {
+                tree_t child;
+                result_t child_result;
+
+                play_move(T, moves[i], &child);
+                evaluate(env, &child, &child_result);
+
+                int child_score = -child_result.score;
+
+#pragma omp critical
+                {
+                    if (child_score > result->score) {
+                        result->score = child_score;
+                        result->best_move = moves[i];
+                        result->pv_length = child_result.pv_length + 1;
+                        for(int j = 0; j < child_result.pv_length; j++)
+                            result->PV[j+1] = child_result.PV[j];
+                        result->PV[0] = moves[i];
+                    }
+                }
+            }
+        }
+#pragma omp taskwait
     } else {
         for (int i = 0; i < n_moves; i++) {
             tree_t child;
@@ -261,6 +287,10 @@ int main(int argc, char **argv) {
 
     time_t marker = time(NULL);
 
+    if (argc >= 3) {
+        task_depth = atoi(argv[2]);
+    }
+
     if (e.rank == 0) {
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
@@ -309,6 +339,8 @@ int main(int argc, char **argv) {
         while (1) {
             MPI_Recv(&tree, 1, e.tree_type, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             if (status.MPI_TAG == TAG_STOP) { break; }
+#pragma omp parallel
+#pragma omp single
             evaluate(&e, &tree, &result);
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }

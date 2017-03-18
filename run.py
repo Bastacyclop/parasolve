@@ -1,17 +1,27 @@
 #!/bin/python
 
 import os
+import sys
 
-input = os.environ.get('INPUT')
-if input == None:
-    input = '"4k//4K//4P w"'
+input = '"4k//4K//4P w"'
+if len(sys.argv) >= 3:
+    input = sys.argv[2]
 
 cmd = "cd seq && make && ./decide {}"
-if (os.environ.get('MPI') == "1"):
-    cmd = "cd mpi && make && mpirun -n 5 decide {}"
-elif (os.environ.get('OMP') == "1"):
-    cmd = "cd omp && make && ./decide {}"
-elif (os.environ.get('MPI_OMP') == "1"):
-    cmd = "cd mpi_omp && make && mpirun -n 5 decide {}"
+if len(sys.argv) >= 2:
+    if (sys.argv[1] == 'mpi'):
+        n = 4
+        if len(sys.argv) >= 4:
+            n = int(sys.argv[3])
+        cmd = "cd mpi && make && mpirun -n {} decide {}".format(n, "{}")
+    elif (sys.argv[1] == 'omp'):
+        cmd = "cd omp && make && ./decide {}"
+    elif (sys.argv[1] == 'mpi_omp'):
+        n = 4
+        if len(sys.argv) >= 4:
+            n = int(sys.argv[3])
+        cmd = "cd mpi_omp && make && mpirun -n {} decide {}".format(n, "{}")
 
-os.system(cmd.format(input))
+cmd = cmd.format(input)
+print(cmd)
+os.system(cmd)

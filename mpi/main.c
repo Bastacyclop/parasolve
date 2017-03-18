@@ -49,7 +49,7 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
     if (ALPHA_BETA_PRUNING)
         sort_moves(T, n_moves, moves);
 
-    if (env->rank == 0 && n_moves >= (env->procs - 1)) {
+    if (env->rank == 0 && T->height == 0) {
         printf("delegating %i moves\n", n_moves);
         move_t* pmoves = malloc((env->procs - 1) * sizeof(move_t));
 
