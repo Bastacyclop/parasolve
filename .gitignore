@@ -1,2 +1,4 @@
 decide
 *.o
+*.png
+plot_cmds
