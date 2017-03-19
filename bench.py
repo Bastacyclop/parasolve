@@ -64,7 +64,7 @@ else:
             data.write(" {}".format(run_omp(i, n)))
         for (m, n) in mpi_omp_ns:
             data.write(" {}".format(run_mpi_omp(i, m, n)))
-            data.write("\n")
+        data.write("\n")
     data.close()
 
 cmds_path = path + "/plot_cmds"
