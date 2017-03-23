@@ -54,9 +54,14 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
     if (env->rank == 0) {
         // here T->height == 0
         printf("delegating %i moves\n", n_moves);
-        move_t* pmoves = malloc((env->procs - 1) * sizeof(move_t));
+        int workers = env->procs - 1;
+        if (n_moves < workers) {
+            workers = n_moves;
+        }
 
-        for (int p = 1; p < env->procs; p++) {
+        move_t* pmoves = malloc(workers * sizeof(move_t));
+
+        for (int p = 1; p <= workers; p++) {
             int m = p - 1;
             tree_t child;
             play_move(T, moves[m], &child);
@@ -83,7 +88,7 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
 
             T->alpha = MAX(T->alpha, child_score);
 
-            if (i <= (n_moves - env->procs)) {
+            if (i < (n_moves - workers)) {
                 int m = i + env->procs - 1;
                 tree_t child;
                 play_move(T, moves[m], &child);
@@ -211,7 +216,7 @@ void commit_tree_datatype(MPI_Datatype* type) {
         128,
         128,
         1,
-    
+
         1,
         1,
         1,
@@ -348,7 +353,7 @@ int main(int argc, char **argv) {
     }
 
     printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);
-  
+
     MPI_Finalize();
     return EXIT_SUCCESS;
 }
