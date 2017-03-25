@@ -1,9 +1,12 @@
 #include "projet.h"
 #include <mpi.h>
 #include <time.h>
+#include <omp.h>
+#include <math.h>
 
 unsigned long long int node_searched = 0;
-int task_depth = 3;
+unsigned long int task_spawned = 0;
+int task_depth;
 
 const int TAG_DATA = 0;
 const int TAG_TASK = 1;
@@ -97,6 +100,10 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
             }
         }
     } else if (T->height <= task_depth) {
+#pragma omp atomic
+        task_spawned += n_moves;
+        omp_lock_t lock;
+        omp_init_lock(&lock);
         for (int i = 0; i < n_moves; i++) {
 #pragma omp task
             {
@@ -108,20 +115,20 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
 
                 int child_score = -child_result.score;
 
-#pragma omp critical
-                {
-                    if (child_score > result->score) {
-                        result->score = child_score;
-                        result->best_move = moves[i];
-                        result->pv_length = child_result.pv_length + 1;
-                        for(int j = 0; j < child_result.pv_length; j++)
-                            result->PV[j+1] = child_result.PV[j];
-                        result->PV[0] = moves[i];
-                    }
+                omp_set_lock(&lock);
+                if (child_score > result->score) {
+                    result->score = child_score;
+                    result->best_move = moves[i];
+                    result->pv_length = child_result.pv_length + 1;
+                    for(int j = 0; j < child_result.pv_length; j++)
+                        result->PV[j+1] = child_result.PV[j];
+                    result->PV[0] = moves[i];
                 }
+                omp_unset_lock(&lock);
             }
         }
 #pragma omp taskwait
+        omp_destroy_lock(&lock);
     } else {
         for (int i = 0; i < n_moves; i++) {
             tree_t child;
@@ -292,6 +299,8 @@ int main(int argc, char **argv) {
 
     time_t marker = time(NULL);
 
+    int min_tasks_by_thread = 2;
+    task_depth = log2(min_tasks_by_thread * omp_get_max_threads());
     if (argc >= 3) {
         task_depth = atoi(argv[2]);
     }
@@ -350,6 +359,7 @@ int main(int argc, char **argv) {
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }
         printf("worker %i down, searched %llu nodes\n", e.rank, node_searched);
+        printf("worker %i task depth = %i, spawned = %lu\n", e.rank, task_depth, task_spawned);
     }
 
     printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);

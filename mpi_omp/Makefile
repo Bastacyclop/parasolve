@@ -1,6 +1,6 @@
 target: decide
 
-CFLAGS= -g -O3 -std=c99 -Wall
+CFLAGS= -g -O3 -std=c99 -Wall -lm
 
 aux.o: aux.c projet.h
 

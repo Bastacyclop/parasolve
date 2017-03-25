@@ -1,22 +1,25 @@
 #include "projet.h"
 #include <time.h>
+#include <omp.h>
+#include <math.h>
 
 /* 2017-02-23 : version 1.0 */
 
 unsigned long long int node_searched = 0;
-int task_depth = 3;
+unsigned long int task_spawned = 0;
+int task_depth;
 
 void evaluate(tree_t * T, result_t *result)
 {
 #pragma omp atomic
     node_searched++;
-  
+
     move_t moves[MAX_MOVES];
     int n_moves;
 
     result->score = -MAX_SCORE - 1;
     result->pv_length = 0;
-        
+
     if (test_draw_or_victory(T, result))
         return;
 
@@ -27,7 +30,7 @@ void evaluate(tree_t * T, result_t *result)
         result->score = (2 * T->side - 1) * heuristic_evaluation(T);
         return;
     }
-        
+
     n_moves = generate_legal_moves(T, &moves[0]);
 
     /* absence de coups légaux : pat ou mat */
@@ -37,6 +40,10 @@ void evaluate(tree_t * T, result_t *result)
     }
 
     if (T->height <= task_depth) {
+#pragma omp atomic
+        task_spawned += n_moves;
+        omp_lock_t lock;
+        omp_init_lock(&lock);
         for (int i = 0; i < n_moves; i++) {
 #pragma omp task
             {
@@ -48,20 +55,20 @@ void evaluate(tree_t * T, result_t *result)
 
                 int child_score = -child_result.score;
 
-#pragma omp critical
-                {
-                    if (child_score > result->score) {
-                        result->score = child_score;
-                        result->best_move = moves[i];
-                        result->pv_length = child_result.pv_length + 1;
-                        for(int j = 0; j < child_result.pv_length; j++)
-                            result->PV[j+1] = child_result.PV[j];
-                        result->PV[0] = moves[i];
-                    }
+                omp_set_lock(&lock);
+                if (child_score > result->score) {
+                    result->score = child_score;
+                    result->best_move = moves[i];
+                    result->pv_length = child_result.pv_length + 1;
+                    for(int j = 0; j < child_result.pv_length; j++)
+                        result->PV[j+1] = child_result.PV[j];
+                    result->PV[0] = moves[i];
                 }
+                omp_unset_lock(&lock);
             }
         }
 #pragma omp taskwait
+        omp_destroy_lock(&lock);
     } else {
         for (int i = 0; i < n_moves; i++) {
             tree_t child;
@@ -100,14 +107,13 @@ void decide(tree_t * T, result_t *result)
 
         printf("depth: %d / score: %.2f / best_move : ", T->depth, 0.01 * result->score);
         print_pv(T, result);
-                
+
         if (DEFINITIVE(result->score))
             break;
     }
 }
 
-int main(int argc, char **argv)
-{  
+int main(int argc, char **argv) {
     tree_t root;
     result_t result;
 
@@ -125,14 +131,16 @@ int main(int argc, char **argv)
         printf("Transposition table ENABLED\n");
         init_tt();
     }
-        
+
     parse_FEN(argv[1], &root);
     print_position(&root);
 
+    int min_tasks_by_thread = 2;
+    task_depth = log2(min_tasks_by_thread * omp_get_max_threads());
     if (argc >= 3) {
         task_depth = atoi(argv[2]);
     }
-        
+
     decide(&root, &result);
 
     printf("\nDécision de la position: ");
@@ -144,10 +152,11 @@ int main(int argc, char **argv)
     }
 
     printf("Node searched: %llu\n", node_searched);
-        
+
     if (TRANSPOSITION_TABLE)
         free_tt();
 
+    printf("task depth = %i, spawned = %lu\n", task_depth, task_spawned);
     printf("execution time: %li\n", time(NULL) - marker);
     return 0;
 }
