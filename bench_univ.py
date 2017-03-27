@@ -14,9 +14,9 @@ inputs = [
     #'"7K//k1P/7p b"',
 ]
 
-mpi_ns = [2, 4, 8]
+mpi_ns = [2, 4, 8, 16]
 omp_ns = [2, 4, 8]
-mpi_omp_ns = [(4, 2), (8, 4)]
+mpi_omp_ns = [(4, 2), (2, 4), (8, 2)]
 
 args = sys.argv
 if len(args) < 2:

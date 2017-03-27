@@ -93,6 +93,8 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
                 *pm = moves[m];
             }
         }
+
+	free(pmoves);
     } else {
         for (int i = 0; i < n_moves; i++) {
             tree_t child;

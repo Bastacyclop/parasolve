@@ -99,6 +99,8 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
                 *pm = moves[m];
             }
         }
+
+	free(pmoves);
     } else if (T->height <= task_depth) {
 #pragma omp atomic
         task_spawned += n_moves;
