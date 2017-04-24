@@ -23,6 +23,9 @@ void evaluate(tree_t * T, result_t *result)
     if (test_draw_or_victory(T, result))
         return;
 
+    if (TRANSPOSITION_TABLE && tt_lookup(T, result))
+        return;
+        
     compute_attack_squares(T);
 
     /* profondeur max atteinte ? si oui, évaluation heuristique */
@@ -38,6 +41,9 @@ void evaluate(tree_t * T, result_t *result)
         result->score = check(T) ? -MAX_SCORE : CERTAIN_DRAW;
         return;
     }
+
+    if (ALPHA_BETA_PRUNING)
+        sort_moves(T, n_moves, moves);
 
     if (T->height <= task_depth) {
 #pragma omp atomic
@@ -64,6 +70,13 @@ void evaluate(tree_t * T, result_t *result)
                         result->PV[j+1] = child_result.PV[j];
                     result->PV[0] = moves[i];
                 }
+
+                /* not possible
+                if (ALPHA_BETA_PRUNING && child_score >= T->beta)
+                    break;
+                */
+
+                T->alpha = MAX(T->alpha, child_score);
                 omp_unset_lock(&lock);
             }
         }
@@ -87,8 +100,16 @@ void evaluate(tree_t * T, result_t *result)
                     result->PV[j+1] = child_result.PV[j];
                 result->PV[0] = moves[i];
             }
+
+            if (ALPHA_BETA_PRUNING && child_score >= T->beta)
+                break;    
+
+            T->alpha = MAX(T->alpha, child_score);
         }
     }
+
+    if (TRANSPOSITION_TABLE)
+        tt_store(T, result);
 }
 
 
