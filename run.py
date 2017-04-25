@@ -21,6 +21,8 @@ if len(sys.argv) >= 2:
         cmd = "cd mpi2 && make && mpirun -n {} decide {}".format(n, "{}")
     elif (sys.argv[1] == 'omp'):
         cmd = "cd omp && make && ./decide {}"
+    elif (sys.argv[1] == 'omp_ab'):
+        cmd = "cd omp_ab && make && ./decide {}"
     elif (sys.argv[1] == 'mpi_omp'):
         n = 4
         if len(sys.argv) >= 4:

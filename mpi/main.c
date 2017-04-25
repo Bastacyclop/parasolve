@@ -83,8 +83,10 @@ void evaluate(const Env* env, tree_t *T, result_t *result) {
                 result->PV[0] = *pm;
             }
 
+            /* TODO
             if (ALPHA_BETA_PRUNING && result->score >= T->beta)
                 continue;
+            */
 
             T->alpha = MAX(T->alpha, child_score);
 

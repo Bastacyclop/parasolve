@@ -47,7 +47,7 @@ void transmit(Node* node, move_t move, result_t* result) {
         result->PV[0] = move;
     }
 
-    // TODO: alpha-beta?
+    node->T.alpha = MAX(node->T.alpha, score);
 
     if (node->countdown == 0 && node->parent) {
         // TODO: transposition table?
@@ -130,16 +130,18 @@ void evaluate_master(Env* env, Node* node) {
             child->parent = node;
             play_move(T, moves[i], &child->T);
             evaluate_master(env, child);
+
+            if (ALPHA_BETA_PRUNING && result->score >= T->beta)
+                break;
         }
     } else {
-        /* TODO: somewhere ?
-        if (ALPHA_BETA_PRUNING && result->score >= T->beta)
-            continue;
-        */
-
         for (int i = 0; i < n_moves; i++) {
             tree_t child;
             int p = next_worker(env);
+
+            if (ALPHA_BETA_PRUNING && result->score >= T->beta)
+                break;
+
             play_move(T, moves[i], &child);
             MPI_Send(&child, 1, env->tree_type, p, TAG_TASK, MPI_COMM_WORLD);
             Task* task = &env->worker_tasks[p - 1];
