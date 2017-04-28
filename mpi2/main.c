@@ -44,7 +44,7 @@ void transmit(Node* node, move_t move, result_t* result) {
         node->result.pv_length = result->pv_length + 1;
         for (int j = 0; j < result->pv_length; j++)
             node->result.PV[j + 1] = result->PV[j];
-        result->PV[0] = move;
+        node->result.PV[0] = move;
     }
 
     // TODO: alpha-beta?
@@ -123,7 +123,7 @@ void evaluate_master(Env* env, Node* node) {
     if (ALPHA_BETA_PRUNING)
         sort_moves(T, n_moves, moves);
 
-    if (T->height <= env->depth) {
+    if (T->height < env->depth) {
         for (int i = 0; i < n_moves; i++) {
             Node* child = malloc(sizeof(Node));
             child->move = moves[i];

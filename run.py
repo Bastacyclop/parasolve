@@ -9,23 +9,17 @@ if len(sys.argv) >= 3:
 
 cmd = "cd seq && make && ./decide {}"
 if len(sys.argv) >= 2:
-    if (sys.argv[1] == 'mpi'):
+    if (sys.argv[1] == 'seq'):
+        pass
+    elif (sys.argv[1][0:3] == 'mpi'):
         n = 4
         if len(sys.argv) >= 4:
             n = int(sys.argv[3])
-        cmd = "cd mpi && make && mpirun -n {} decide {}".format(n, "{}")
-    elif (sys.argv[1] == 'mpi2'):
-        n = 4
-        if len(sys.argv) >= 4:
-            n = int(sys.argv[3])
-        cmd = "cd mpi2 && make && mpirun -n {} decide {}".format(n, "{}")
-    elif (sys.argv[1] == 'omp'):
-        cmd = "cd omp && make && ./decide {}"
-    elif (sys.argv[1] == 'mpi_omp'):
-        n = 4
-        if len(sys.argv) >= 4:
-            n = int(sys.argv[3])
-        cmd = "cd mpi_omp && make && mpirun -n {} decide {}".format(n, "{}")
+        cmd = "cd {} && make && mpirun -n {} decide {}".format(sys.argv[1], n, "{}")
+    elif (sys.argv[1][0:3] == 'omp'):
+        cmd = "cd {} && make && ./decide {}".format(sys.argv[1], "{}")
+    else:
+        exit("unknown method :s")
 
 cmd = cmd.format(input)
 print(cmd)
