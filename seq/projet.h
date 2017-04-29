@@ -13,7 +13,7 @@
  ********************************************************/
 
 #define ALPHA_BETA_PRUNING  1
-#define TRANSPOSITION_TABLE 0
+#define TRANSPOSITION_TABLE 1
 
 /*******************************************************
  Macros, définitions, types de données
