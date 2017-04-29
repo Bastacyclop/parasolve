@@ -40,8 +40,12 @@ void evaluate(tree_t* T, result_t* result) {
     if (test_draw_or_victory(T, result))
         return;
 
-    if (TRANSPOSITION_TABLE && tt_lookup(T, result))
-        return;
+    if (TRANSPOSITION_TABLE) {
+        int available;
+#pragma omp critical
+        available = tt_lookup(T, result);
+        if (available) return;
+    }
         
     compute_attack_squares(T);
 
@@ -98,8 +102,10 @@ void evaluate(tree_t* T, result_t* result) {
         }
     }
 
-    if (TRANSPOSITION_TABLE)
+    if (TRANSPOSITION_TABLE) {
+#pragma omp critical
         tt_store(T, result);
+    }
 }
 
 
