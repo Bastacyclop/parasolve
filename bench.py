@@ -104,22 +104,23 @@ def run_mpi_omp(path, input, mpi_n, omp_n):
     cmd = "OMP_NUM_THREADS={} ./run.py {} '{}' {} | grep \"execution time (0):\" | grep -oE \"[^ ]+$\""
     return run(cmd.format(omp_n, path, input, mpi_n))
 
-def write_data(data, index, processors, time):
-    data.write("{} {} {}\n".format(index, processors, time))
+def write_data(data, index, seq_time, processors, time):
+    data.write("{} {} {}\n".format(index, seq_time, processors, time))
+    data.flush() # make sure we don't lose that stuff
+    os.fsync(data)
 
 data_path = bench_path + "/" + method
 if os.path.exists(data_path):
     print("'{}' already exists, skipping data collection".format(data_path))
 else:
     print("collecting data into '{}'".format(data_path))
-    data = open(data_path, "w")
-    for index, i in enumerate(inputs):
-        write_data(data, index, 1, run_seq(i))
-        for m in mpi_ns:
-            write_data(data, index, m, run_mpi(method_path, i, m))
-        for n in omp_ns:
-            write_data(data, index, n, run_omp(method_path, i, n))
-        for (m, n) in mpi_omp_ns:
-            p = 1 + (m - 1) * n
-            write_data(data, index, p, run_mpi_omp(method_path, i, m, n))
-    data.close()
+    with open(data_path, "w") as data:
+        for index, i in enumerate(inputs):
+            seq_time = run_seq(i)
+            for m in mpi_ns:
+                write_data(data, index, seq_time, m, run_mpi(method_path, i, m))
+            for n in omp_ns:
+                write_data(data, index, seq_time, n, run_omp(method_path, i, n))
+            for (m, n) in mpi_omp_ns:
+                p = 1 + (m - 1) * n
+                write_data(data, index, seq_time, p, run_mpi_omp(method_path, i, m, n))
