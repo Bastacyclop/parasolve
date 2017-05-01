@@ -408,13 +408,17 @@ int main(int argc, char **argv) {
         tree_t tree;
         result_t result;
         printf("worker %i up\n", e.rank);
+        clock_t idle_marker = clock();
+        clock_t idle_time = 0;
         while (1) {
             MPI_Recv(&tree, 1, e.tree_type, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            idle_time += clock() - idle_marker;
             if (status.MPI_TAG == TAG_STOP) { break; }
             evaluate(&tree, &result);
+            idle_marker = clock();
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }
-        printf("worker %i down, searched %llu nodes\n", e.rank, node_searched);
+        printf("worker %i down, searched %llu nodes, %lu idle time\n", e.rank, node_searched, idle_time / CLOCKS_PER_SEC);
     }
 
     printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);
