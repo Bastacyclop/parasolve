@@ -1,8 +1,22 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "projet.h"
 #include <mpi.h>
 #include <time.h>
 
 unsigned long long int node_searched = 0;
+
+typedef struct timespec Time;
+void get_time(Time* t) {
+    clock_gettime(CLOCK_MONOTONIC, t);
+}
+
+double seconds_from(const Time* t) {
+    Time now;
+    get_time(&now);
+    return (double)(now.tv_sec - t->tv_sec) +
+        (double)(now.tv_nsec - t->tv_nsec) / 1000000000.;
+}
 
 const int TAG_DATA = 0;
 const int TAG_TASK = 1;
@@ -357,7 +371,8 @@ int main(int argc, char **argv) {
     commit_tree_datatype(&e.tree_type);
     commit_result_datatype(&e.result_type);
 
-    clock_t marker = clock();
+    Time start;
+    get_time(&start);
 
     if (TRANSPOSITION_TABLE)
         init_tt();
@@ -402,32 +417,30 @@ int main(int argc, char **argv) {
         }
 
         printf("master down, searched %llu nodes\n", node_searched);
-        clock_t execution_time = clock() - marker;
-        double et = (double)(execution_time) / CLOCKS_PER_SEC;
-        printf("execution time: %lf\n", et);
+        printf("execution time: %lf\n", seconds_from(&start));
         free(e.worker_tasks);
     } else {
         MPI_Status status;
         tree_t tree;
         result_t result;
         printf("worker %i up\n", e.rank);
-        clock_t idle_marker = clock();
-        clock_t idle_time = 0;
+        Time idle_start;
+        get_time(&idle_start);
+        double idle_time = 0;
         while (1) {
             MPI_Recv(&tree, 1, e.tree_type, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            idle_time += clock() - idle_marker;
+            idle_time += seconds_from(&idle_start);
             if (status.MPI_TAG == TAG_STOP) { break; }
             evaluate(&tree, &result);
-            idle_marker = clock();
+            get_time(&idle_start);
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }
 
-        clock_t execution_time = clock() - marker;
-        double et = (double)(execution_time) / CLOCKS_PER_SEC;
-        double wt = (double)(execution_time - idle_time) / CLOCKS_PER_SEC;
-        double it = (double)(idle_time) / CLOCKS_PER_SEC;
-        double speed = (double)(node_searched) / wt;
-        printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n", e.rank, node_searched, et, wt, it, speed);
+        double execution_time = seconds_from(&start);
+        double work_time = execution_time - idle_time;
+        double speed = (double)(node_searched) / work_time;
+        printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n",
+               e.rank, node_searched, execution_time, work_time, idle_time, speed);
     }
 
 

@@ -1,9 +1,21 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "projet.h"
 #include <time.h>
 #include <omp.h>
 #include <math.h>
 
-/* 2017-02-23 : version 1.0 */
+typedef struct timespec Time;
+void get_time(Time* t) {
+    clock_gettime(CLOCK_MONOTONIC, t);
+}
+
+double seconds_from(const Time* t) {
+    Time now;
+    get_time(&now);
+    return (double)(now.tv_sec - t->tv_sec) +
+        (double)(now.tv_nsec - t->tv_nsec) / 1000000000.;
+}
 
 unsigned long long int t_node_searched = 0;
 unsigned long int t_task_spawned = 0;
@@ -134,7 +146,8 @@ int main(int argc, char **argv) {
     tree_t root;
     result_t result;
 
-    clock_t marker = clock();
+    Time start;
+    get_time(&start);
 
     if (argc < 2) {
         printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
@@ -181,8 +194,6 @@ int main(int argc, char **argv) {
         free_tt();
 
     printf("task depth = %i\n", task_depth);
-    clock_t execution_time = clock() - marker;
-    double et = (double)(execution_time) / CLOCKS_PER_SEC;
-    printf("execution time: %lf\n", et);
+    printf("execution time: %lf\n", seconds_from(&start));
     return 0;
 }
