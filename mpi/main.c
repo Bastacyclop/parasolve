@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
     commit_tree_datatype(&e.tree_type);
     commit_result_datatype(&e.result_type);
 
-    time_t marker = time(NULL);
+    clock_t marker = clock();
 
     if (e.rank == 0) {
         if (argc < 2) {
@@ -304,8 +304,10 @@ int main(int argc, char **argv) {
                 printf("BUG\n");
         }
 
-        printf("Node searched: %llu\n", node_searched);
-
+        printf("master down, searched %llu nodes\n", node_searched);
+        clock_t execution_time = clock() - marker;
+        double et = (double)(execution_time) / CLOCKS_PER_SEC;
+        printf("execution time: %lf\n", et);
         if (TRANSPOSITION_TABLE)
             free_tt();
     } else {
@@ -313,16 +315,24 @@ int main(int argc, char **argv) {
         tree_t tree;
         result_t result;
         printf("worker %i up\n", e.rank);
+        clock_t idle_marker = clock();
+        clock_t idle_time = 0;
         while (1) {
             MPI_Recv(&tree, 1, e.tree_type, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            idle_time += clock() - idle_marker;
             if (status.MPI_TAG == TAG_STOP) { break; }
             evaluate(&e, &tree, &result);
+            idle_marker = clock();
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }
-        printf("worker %i down, searched %llu nodes\n", e.rank, node_searched);
-    }
 
-    printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);
+        clock_t execution_time = clock() - marker;
+        double et = (double)(execution_time) / CLOCKS_PER_SEC;
+        double wt = (double)(execution_time - idle_time) / CLOCKS_PER_SEC;
+        double it = (double)(idle_time) / CLOCKS_PER_SEC;
+        double speed = (double)(node_searched) / wt;
+        printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n", e.rank, node_searched, et, wt, it, speed);
+    }
 
     MPI_Finalize();
     return EXIT_SUCCESS;

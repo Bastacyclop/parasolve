@@ -85,23 +85,22 @@ if input("is this looking good ? (y/n) ") != "y":
     exit("see ya!")
 
 def run(cmd):
+    cmd += " | grep \"execution time:\" | grep -oE \"[^ ]+$\""
     print(cmd)
-    return int(subprocess.check_output(cmd, shell=True))
+    return float(subprocess.check_output(cmd, shell=True))
 
 def run_seq(input):
-    cmd = "./run.py seq '{}' | grep \"execution time:\" | grep -oE \"[^ ]+$\""
-    return run(cmd.format(input))
+    return run("./run.py seq '{}'".format(input))
 
 def run_mpi(path, input, n):
-    cmd = "./run.py {} '{}' {} | grep \"execution time (0):\" | grep -oE \"[^ ]+$\""
-    return run(cmd.format(path, input, n))
+    return run("./run.py {} '{}' {}".format(path, input, n))
 
 def run_omp(path, input, n):
-    cmd = "OMP_NUM_THREADS={} ./run.py {} '{}' | grep \"execution time:\" | grep -oE \"[^ ]+$\""
+    cmd = "OMP_NUM_THREADS={} ./run.py {} '{}'"
     return run(cmd.format(n, path, input))
 
 def run_mpi_omp(path, input, mpi_n, omp_n):
-    cmd = "OMP_NUM_THREADS={} ./run.py {} '{}' {} | grep \"execution time (0):\" | grep -oE \"[^ ]+$\""
+    cmd = "OMP_NUM_THREADS={} ./run.py {} '{}' {}"
     return run(cmd.format(omp_n, path, input, mpi_n))
 
 def write_data(data, index, seq_time, processors, time):

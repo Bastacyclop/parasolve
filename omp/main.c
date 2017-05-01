@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
     tree_t root;
     result_t result;
 
-    time_t marker = time(NULL);
+    clock_t marker = clock();
 
     if (argc < 2) {
         printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
@@ -178,6 +178,8 @@ int main(int argc, char **argv) {
         free_tt();
 
     printf("task depth = %i, spawned = %lu\n", task_depth, task_spawned);
-    printf("execution time: %li\n", time(NULL) - marker);
+    clock_t execution_time = clock() - marker;
+    double et = (double)(execution_time) / CLOCKS_PER_SEC;
+    printf("execution time: %lf\n", et);
     return 0;
 }
