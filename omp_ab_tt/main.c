@@ -165,8 +165,15 @@ int main(int argc, char **argv) {
     parse_FEN(argv[1], &root);
     print_position(&root);
 
-    int min_tasks_by_thread = 3;
-    task_depth = log2(min_tasks_by_thread * omp_get_max_threads());
+    int branching = 16;
+    if (ALPHA_BETA_PRUNING) {
+        if (TRANSPOSITION_TABLE) {
+            branching = 8;
+        } else {
+            branching = 12;
+        }
+    }
+    task_depth = log(3500 * omp_get_max_threads()) / log(branching);
     if (argc >= 3) {
         task_depth = atoi(argv[2]);
     }

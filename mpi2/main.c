@@ -3,6 +3,7 @@
 #include "projet.h"
 #include <mpi.h>
 #include <time.h>
+#include <math.h>
 
 unsigned long long int node_searched = 0;
 
@@ -380,8 +381,7 @@ int main(int argc, char **argv) {
     if (e.rank == 0) {
         e.idle_workers = (e.procs - 1);
         e.worker_tasks = malloc(e.idle_workers * sizeof(Task));
-        int tasks_per_worker = 4;
-        e.depth = 3;
+        e.depth = log(4 * (e.procs - 1)) / log(16);
 
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
