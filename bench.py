@@ -5,13 +5,13 @@ import sys
 import subprocess
 
 inputs_naive = [
-    '"7K//k1P/7p w"',
-    '"///2kpK/7P w"',
+    #'"7K//k1P/7p w"',
+    #'"///2kpK/7P w"',
     '"4k//4K/4P w"',
     '"4k//4K//4P w"',
     '"/ppp//PPP//7k//7K w"',
-    '"4k//4K///4P w"',
-    '"7K//k1P/7p b"',
+    #'"4k//4K///4P w"',
+    #'"7K//k1P/7p b"',
 ]
 
 inputs_ab = [
@@ -19,7 +19,7 @@ inputs_ab = [
     '"4k///4K///4P w"',
     '"/5p/4p/4PP/4K///k w"',
     '"/2k1K////3P/3P w"',
-    '"/5p/4p/4P/4KP///k w"',
+    #'"/5p/4p/4P/4KP///k w"',
 ]
 
 inputs_ab_tt = [
@@ -30,9 +30,9 @@ inputs_ab_tt = [
     '"/6pp/5p/3k1PP/5K1P w"',
 ]
 
-mpi_ns = [2, 4, 8, 16]
-omp_ns = [2, 4, 8]
-mpi_omp_ns = [(4, 2), (4, 4), (8, 4), (16, 8)]
+mpi_ns = list(range(2, 15))
+omp_ns = list(range(2, 9))
+mpi_omp_ns = [(p, 4) for p in range(3, 15)]
 
 args = sys.argv
 if len(args) < 3:
@@ -57,7 +57,7 @@ elif method in ["omp"]:
     mpi_ns = []
     mpi_omp_ns = []
     inputs = inputs_naive
-elif method in ["mpi_omp"]:
+elif method in ["mpi_omp", "mpi2_omp"]:
     mpi_ns = []
     omp_ns = []
     inputs = inputs_naive
@@ -103,8 +103,8 @@ def run_mpi_omp(path, input, mpi_n, omp_n):
     cmd = "OMP_NUM_THREADS={} ./run.py {} '{}' {}"
     return run(cmd.format(omp_n, path, input, mpi_n))
 
-def write_data(data, index, seq_time, processors, time):
-    data.write("{} {} {}\n".format(index, seq_time, processors, time))
+def write_data(data, index, instance, seq_time, processors, time):
+    data.write("{} {} {} {} {}\n".format(index, instance, seq_time, processors, time))
     data.flush() # make sure we don't lose that stuff
     os.fsync(data)
 
@@ -117,9 +117,9 @@ else:
         for index, i in enumerate(inputs):
             seq_time = run_seq(i)
             for m in mpi_ns:
-                write_data(data, index, seq_time, m, run_mpi(method_path, i, m))
+                write_data(data, index, i, seq_time, m, run_mpi(method_path, i, m))
             for n in omp_ns:
-                write_data(data, index, seq_time, n, run_omp(method_path, i, n))
+                write_data(data, index, i, seq_time, n, run_omp(method_path, i, n))
             for (m, n) in mpi_omp_ns:
                 p = 1 + (m - 1) * n
-                write_data(data, index, seq_time, p, run_mpi_omp(method_path, i, m, n))
+                write_data(data, index, i, seq_time, p, run_mpi_omp(method_path, i, m, n))

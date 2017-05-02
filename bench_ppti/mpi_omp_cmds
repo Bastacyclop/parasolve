@@ -1,0 +1,7 @@
+set terminal png size 800, 600
+set output "mpi_omp.png"
+set key outside
+set xlabel "nombre de threads"
+set ylabel "accélération"
+plot for [i=0:2] "mpi2_omp" u 4:(($1==i)?($3/$5):(1/0)) w lines title 'mpi2_omp' lc rgb "#1e60b7",\
+     x title 'a=n' lc rgb "#b71d1d"
