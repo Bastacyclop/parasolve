@@ -1,8 +1,22 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "projet.h"
 #include <mpi.h>
 #include <time.h>
 #include <omp.h>
 #include <math.h>
+
+typedef struct timespec Time;
+void get_time(Time* t) {
+    clock_gettime(CLOCK_MONOTONIC, t);
+}
+
+double seconds_from(const Time* t) {
+    Time now;
+    get_time(&now);
+    return (double)(now.tv_sec - t->tv_sec) +
+        (double)(now.tv_nsec - t->tv_nsec) / 1000000000.;
+}
 
 unsigned long long int node_searched = 0;
 unsigned long int task_spawned = 0;
@@ -299,7 +313,8 @@ int main(int argc, char **argv) {
     commit_tree_datatype(&e.tree_type);
     commit_result_datatype(&e.result_type);
 
-    time_t marker = time(NULL);
+    Time start;
+    get_time(&start);
 
     task_depth = 1 + log(3500 * omp_get_max_threads()) / log(16);
     if (argc >= 3) {
@@ -342,8 +357,8 @@ int main(int argc, char **argv) {
                 printf("BUG\n");
         }
 
-        printf("Node searched: %llu\n", node_searched);
-
+        printf("master down, searched %llu nodes\n", node_searched);
+        printf("execution time: %lf\n", seconds_from(&start));
         if (TRANSPOSITION_TABLE)
             free_tt();
     } else {
@@ -351,19 +366,27 @@ int main(int argc, char **argv) {
         tree_t tree;
         result_t result;
         printf("worker %i up\n", e.rank);
+        Time idle_start;
+        get_time(&idle_start);
+        double idle_time = 0;
         while (1) {
             MPI_Recv(&tree, 1, e.tree_type, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            idle_time += seconds_from(&idle_start);
             if (status.MPI_TAG == TAG_STOP) { break; }
 #pragma omp parallel
 #pragma omp single
             evaluate(&e, &tree, &result);
+            get_time(&idle_start);
             MPI_Send(&result, 1, e.result_type, 0, TAG_DATA, MPI_COMM_WORLD);
         }
-        printf("worker %i down, searched %llu nodes\n", e.rank, node_searched);
+
+        double execution_time = seconds_from(&start);
+        double work_time = execution_time - idle_time;
+        double speed = (double)(node_searched) / work_time;
+        printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n",
+               e.rank, node_searched, execution_time, work_time, idle_time, speed);
         printf("worker %i task depth = %i, spawned = %lu\n", e.rank, task_depth, task_spawned);
     }
-
-    printf("execution time (%i): %li\n", e.rank, time(NULL) - marker);
 
     MPI_Finalize();
     return EXIT_SUCCESS;

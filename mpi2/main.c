@@ -416,7 +416,7 @@ int main(int argc, char **argv) {
                 printf("BUG\n");
         }
 
-        printf("master down, searched %llu nodes\n", node_searched);
+        printf("master down, task depth = %i, searched %llu nodes\n", e.depth, node_searched);
         printf("execution time: %lf\n", seconds_from(&start));
         free(e.worker_tasks);
     } else {

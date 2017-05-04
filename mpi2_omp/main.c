@@ -469,7 +469,7 @@ int main(int argc, char **argv) {
                 printf("BUG\n");
         }
 
-        printf("master down, searched %llu nodes\n", node_searched);
+        printf("master down, task depth = %i, searched %llu nodes\n", e.depth, node_searched);
         printf("execution time: %lf\n", seconds_from(&start));
         free(e.worker_tasks);
     } else {
@@ -496,6 +496,7 @@ int main(int argc, char **argv) {
         double speed = (double)(node_searched) / work_time;
         printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n",
                e.rank, node_searched, execution_time, work_time, idle_time, speed);
+        printf("worker %i task depth = %i, spawned = %lu\n", e.rank, task_depth, task_spawned);
     }
 
 
