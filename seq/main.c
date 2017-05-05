@@ -74,7 +74,6 @@ void evaluate(tree_t * T, result_t *result)
 
         if (ALPHA_BETA_PRUNING && child_score >= T->beta)
             break;    
-
         T->alpha = MAX(T->alpha, child_score);
     }
 
