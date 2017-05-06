@@ -412,13 +412,22 @@ int main(int argc, char **argv) {
 
     if (TRANSPOSITION_TABLE)
         init_tt();
+   
+    int branching = 6;
+    if (ALPHA_BETA_PRUNING) {
+        if (TRANSPOSITION_TABLE) {
+            branching = 2;
+        } else {
+            branching = 4;
+        }
+    }
 
     if (e.rank == 0) {
         e.active_workers = 0;
         e.next_worker = 0;
         e.task_count = 0;
         e.worker_tasks = malloc((e.procs - 1) * sizeof(Task));
-        e.depth = 2;//log(10 * (e.procs - 1)) / log(16);
+        e.depth = log(18 * (e.procs - 1)) / log(branching);
 
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);

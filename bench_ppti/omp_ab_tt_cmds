@@ -1,7 +1,8 @@
-set terminal png size 800, 600
+set terminal png size 600, 400
 set output "omp_ab_tt.png"
 set key outside
 set xlabel "nombre de threads"
 set ylabel "accélération"
+set logscale y 10
 plot for [i=0:4] "omp_ab_tt" u 4:(($1==i)?($3/$5):(1/0)) w lines title 'omp ab tt' lc rgb "#1e60b7",\
      x title 'a=n' lc rgb "#b71d1d"

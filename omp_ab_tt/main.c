@@ -36,8 +36,10 @@ int assimilate(tree_t* T, result_t* result,
         result->PV[0] = move;
     }
 
-    T->alpha = MAX(T->alpha, child_score);
-    return ALPHA_BETA_PRUNING && T->alpha >= T->beta;
+    int alpha = MAX(T->alpha, child_score);
+#pragma omp atomic write
+    T->alpha = alpha;
+    return ALPHA_BETA_PRUNING && alpha >= T->beta;
 }
 
 void evaluate(tree_t* T, result_t* result) {

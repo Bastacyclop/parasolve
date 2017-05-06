@@ -603,6 +603,7 @@ void play_move(tree_t *T, move_t move, tree_t *child) {
   child->depth = T->depth - 1;
   child->height = T->height + 1;
   child->alpha_start = child->alpha = -T->beta;
+#pragma omp atomic
   child->beta = -T->alpha;
   child->suggested_move = BAD_MOVE;
   
