@@ -4,6 +4,8 @@
 #include <time.h>
 
 unsigned long long int node_searched = 0;
+unsigned long long int node_branching_acc = 0;
+unsigned long long int node_branching_n = 0;
 
 typedef struct timespec Time;
 void get_time(Time* t) {
@@ -42,6 +44,8 @@ void evaluate(tree_t * T, result_t *result)
     }
         
     n_moves = generate_legal_moves(T, &moves[0]);
+    node_branching_acc += n_moves;
+    node_branching_n++;
 
     /* absence de coups légaux : pat ou mat */
     if (n_moves == 0) {
@@ -74,6 +78,7 @@ void evaluate(tree_t * T, result_t *result)
 
         if (ALPHA_BETA_PRUNING && child_score >= T->beta)
             break;    
+
         T->alpha = MAX(T->alpha, child_score);
     }
 
@@ -136,6 +141,7 @@ int main(int argc, char **argv)
     }
 
     printf("Node searched: %llu\n", node_searched);
+    printf("Node branching: %lf\n", (double)(node_branching_acc) / (double)(node_branching_n));
         
     if (TRANSPOSITION_TABLE)
         free_tt();

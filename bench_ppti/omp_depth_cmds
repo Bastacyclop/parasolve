@@ -1,0 +1,9 @@
+set terminal png size 600, 400
+set output "omp_depth.png"
+set key outside
+set xlabel "nombre de processeurs"
+set ylabel "profondeur optimale"
+set xrange [1:7]
+plot "omp_depth" u 2:(($1==0)?($3):(1/0)):4 w yerrorbars title "4k//4k//4P w",\
+     "omp_depth" u 2:(($1==1)?($3):(1/0)):4 w yerrorbars title "/ppp//PPP//7k//7K w",\
+     log(360*x)/log(6) title "log_{6}(360n)"

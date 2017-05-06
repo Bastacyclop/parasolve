@@ -381,7 +381,7 @@ int main(int argc, char **argv) {
     if (e.rank == 0) {
         e.idle_workers = (e.procs - 1);
         e.worker_tasks = malloc(e.idle_workers * sizeof(Task));
-        e.depth = log(4 * (e.procs - 1)) / log(16);
+        e.depth = log(18 * (e.procs - 1)) / log(6);
 
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
@@ -442,6 +442,7 @@ int main(int argc, char **argv) {
         printf("worker %i down, searched %llu nodes, %lf execution time (%lf work + %lf idle), speed: %lf node/s\n",
                e.rank, node_searched, execution_time, work_time, idle_time, speed);
     }
+
 
     MPI_Finalize();
     if (TRANSPOSITION_TABLE)

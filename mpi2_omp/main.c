@@ -422,12 +422,12 @@ int main(int argc, char **argv) {
     if (TRANSPOSITION_TABLE)
         init_tt();
 
-    e.depth = log(4 * (e.procs - 1)) / log(16);
+    e.depth = log(18 * (e.procs - 1)) / log(6);
     if (argc >= 3) {
         e.depth = atoi(argv[2]);
     }
 
-    task_depth = e.depth + log(3500 * omp_get_max_threads()) / log(16);
+    task_depth = log(360 * omp_get_max_threads()) / log(6) + e.depth + 1;
     if (argc >= 4) {
         task_depth = atoi(argv[3]);
     }

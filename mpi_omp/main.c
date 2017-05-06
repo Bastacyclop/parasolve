@@ -316,7 +316,7 @@ int main(int argc, char **argv) {
     Time start;
     get_time(&start);
 
-    task_depth = 1 + log(3500 * omp_get_max_threads()) / log(16);
+    task_depth = log(360 * omp_get_max_threads()) / log(8) + 1;
     if (argc >= 3) {
         task_depth = atoi(argv[2]);
     }
