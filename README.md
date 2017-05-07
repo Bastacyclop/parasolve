@@ -11,5 +11,5 @@ make clean
 
 # and also some handy scripts
 # run a decision implementation
-[OMP_NUM_THREADS=omp_n] ./run.py [(seq | mpi | omp | mpi_omp) [input [mpi_n]]]
+[OMP_NUM_THREADS=omp_n] ./run.py [implementation_directory [input [mpi_n]]]
 ```
