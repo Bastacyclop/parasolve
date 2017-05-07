@@ -61,7 +61,7 @@ elif method in ["mpi_omp", "mpi2_omp"]:
     mpi_ns = []
     omp_ns = []
     inputs = inputs_naive
-elif method in ["mpi2_ab"]:
+elif method in ["mpi2_ab", "mpi3_ab"]:
     omp_ns = []
     mpi_omp_ns = []
     inputs = inputs_ab
@@ -70,6 +70,10 @@ elif method in ["omp_ab", "omp_ab_tt"]:
     mpi_omp_ns = []
     inputs = inputs_ab if method == "omp_ab" else inputs_ab_tt
     method_path = "omp_ab_tt"
+elif method in ["mpi3_omp_ab"]:
+    mpi_ns = []
+    omp_ns = []
+    inputs = inputs_ab
 else:
     exit("unknown method")
 
