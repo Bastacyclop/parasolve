@@ -23,144 +23,27 @@ const int TAG_DATA = 0;
 const int TAG_TASK = 1;
 const int TAG_STOP = 2;
 
-typedef struct Task Task;
-typedef struct Node Node;
-
 typedef struct {
     int rank;
     int procs;
     MPI_Datatype tree_type;
     MPI_Datatype result_type;
-    // Master only:
-    int active_workers;
-    int next_worker;
-    int task_count;
-    Task* worker_tasks;
-    int depth;
 } Env;
 
-struct Task {
-    move_t move;
-    Node* parent;
-};
-
-struct Node {
-    tree_t T;
-    result_t result;
-    move_t moves[MAX_MOVES];
-    int n_moves;
-    int countdown;
-    move_t move; // undefined if root
-    Node* parent; // null if root
-};
-
-void transmit(Env* env, Node* node, move_t move, result_t* result);
-void send_task(Env* env, Node* parent, move_t move, tree_t* child);
-void evaluate_master(Env* env, Node* node);
-
-int may_drop_node(Env* env, Node* node) {
-    if (node->countdown == 0 && node->parent) {
-        // TODO: transposition table?
-        transmit(env, node->parent, node->move, &node->result);
-        free(node);
-        return 1;
-    }
-    return 0;
-}
-
-void transmit(Env* env, Node* node, move_t move, result_t* result) {
-    int is_elder = node->countdown == node->n_moves &&
-        node->T.height < env->depth;
-    node->countdown--;
-    int score = -result->score;
-    if (score > node->result.score) {
-        node->result.score = score;
-        node->result.best_move = move;
-        node->result.pv_length = result->pv_length + 1;
-        for (int j = 0; j < result->pv_length; j++)
-            node->result.PV[j + 1] = result->PV[j];
-        node->result.PV[0] = move;
-    }
-
-    node->T.alpha = MAX(node->T.alpha, score);
-
-    if (is_elder) {
-        if (may_drop_node(env, node)) return;
-        if (ALPHA_BETA_PRUNING && node->T.alpha >= node->T.beta) {
-            node->countdown = 0;
-            may_drop_node(env, node);
-        } else {
-            for (int i = 1; i < node->n_moves; i++) {
-                Node* child = malloc(sizeof(Node));
-                child->move = node->moves[i];
-                child->parent = node;
-                play_move(&node->T, node->moves[i], &child->T);
-                evaluate_master(env, child);
-            }
-        }
-    } else {
-        may_drop_node(env, node);
-    }
-}
-
-void wait_task(Env* env) {
-    result_t result;
-    MPI_Status status;
-    MPI_Recv(&result, 1, env->result_type, MPI_ANY_SOURCE,
-             TAG_DATA, MPI_COMM_WORLD, &status);
-    Task task = env->worker_tasks[status.MPI_SOURCE - 1];
-    env->task_count--;
-    // printf(" #%i from %i\n", env->task_count, status.MPI_SOURCE);
-    env->next_worker = status.MPI_SOURCE;
-    transmit(env, task.parent, task.move, &result);
-}
-
-void send_task(Env* env, Node* parent, move_t move, tree_t* child) {
-    int p;
-    if (env->next_worker != 0) {
-        p = env->next_worker;
-        env->next_worker = 0;
-    } else if (env->active_workers < (env->procs - 1)) {
-        env->active_workers++;
-        p = env->active_workers;
-    } else {
-        wait_task(env);
-        return send_task(env, parent, move, child);
-    }
-
-    MPI_Send(child, 1, env->tree_type, p, TAG_TASK, MPI_COMM_WORLD);
-    Task* task = &env->worker_tasks[p - 1];
-    task->move = move;
-    task->parent = parent;
-    env->task_count++;
-    // printf("SENT #%i to %i\n", env->task_count, p);
-}
-
-void task_barrier(Env* env) {
-    while (env->task_count > 0) {
-        wait_task(env);
-    }
-    env->active_workers = 0;
-    env->next_worker = 0;
-}
-
-void evaluate_master(Env* env, Node* node) {
+void evaluate_master(const Env* env, tree_t* T, result_t* result) {
     node_searched++;
 
-    tree_t* T = &node->T;
-    result_t* result = &node->result;
+    move_t moves[MAX_MOVES];
+    int n_moves;
 
     result->score = -MAX_SCORE - 1;
     result->pv_length = 0;
-    node->countdown = 0;
 
     if (test_draw_or_victory(T, result)) {
-        if (node->parent) transmit(env, node->parent, node->move, &node->result);
         return;
     }
 
     if (TRANSPOSITION_TABLE && tt_lookup(T, result)) {
-        if (node->parent) transmit(env, node->parent, node->move, &node->result);
         return;
     }
 
@@ -168,35 +51,96 @@ void evaluate_master(Env* env, Node* node) {
 
     if (T->depth == 0) {
         result->score = (2 * T->side - 1) * heuristic_evaluation(T);
-        if (node->parent) transmit(env, node->parent, node->move, &node->result);
         return;
     }
 
-    node->n_moves = generate_legal_moves(T, node->moves);
-    node->countdown = node->n_moves;
+    n_moves = generate_legal_moves(T, moves);
 
-    if (node->n_moves == 0) {
+    if (n_moves == 0) {
         result->score = check(T) ? -MAX_SCORE : CERTAIN_DRAW;
-        if (node->parent) transmit(env, node->parent, node->move, &node->result);
         return;
     }
 
     if (ALPHA_BETA_PRUNING)
-        sort_moves(T, node->n_moves, node->moves);
+        sort_moves(T, n_moves, moves);
 
-    if (T->height < env->depth) {
-        Node* child = malloc(sizeof(Node));
-        child->move = node->moves[0];
-        child->parent = node;
-        play_move(T, node->moves[0], &child->T);
-        evaluate_master(env, child);
-    } else {
-        for (int i = 0; i < node->n_moves; i++) {
+    int m = 0;
+    {
+        tree_t child;
+        result_t child_result;
+
+        play_move(T, moves[m], &child);
+        evaluate_master(env, &child, &child_result);
+
+        int child_score = -child_result.score;
+
+        if (child_score > result->score) {
+            result->score = child_score;
+            result->best_move = moves[m];
+            result->pv_length = child_result.pv_length + 1;
+            for (int j = 0; j < child_result.pv_length; j++)
+                result->PV[j + 1] = child_result.PV[j];
+            result->PV[0] = moves[m];
+        }
+
+        if (ALPHA_BETA_PRUNING && child_score >= T->beta)
+            return;
+
+        T->alpha = MAX(T->alpha, child_score);
+        m++;
+    }
+    int seq_end = m;
+
+    int workers = env->procs - 1;
+    int worker_moves = n_moves - seq_end;
+    if (worker_moves < workers) {
+        workers = worker_moves;
+    }
+
+    move_t* pmoves = malloc(workers * sizeof(move_t));
+
+    for (int p = 1; p <= workers; p++) {
+        tree_t child;
+        play_move(T, moves[m], &child);
+        MPI_Send(&child, 1, env->tree_type, p, TAG_TASK, MPI_COMM_WORLD);
+        pmoves[p - 1] = moves[m];
+        m++;
+    }
+
+    for (int i = 0; i < worker_moves; i++) {
+        result_t child_result;
+        MPI_Status status;
+        MPI_Recv(&child_result, 1, env->result_type,
+                 MPI_ANY_SOURCE, TAG_DATA, MPI_COMM_WORLD, &status);
+
+        int child_score = -child_result.score;
+        move_t* move = &pmoves[status.MPI_SOURCE - 1];
+
+        if (child_score > result->score) {
+            result->score = child_score;
+            result->best_move = *move;
+            result->pv_length = child_result.pv_length + 1;
+            for (int j = 0; j < child_result.pv_length; j++)
+                result->PV[j + 1] = child_result.PV[j];
+            result->PV[0] = *move;
+        }
+
+        if (ALPHA_BETA_PRUNING && result->score >= T->beta) {
+            continue;
+        }
+
+        T->alpha = MAX(T->alpha, child_score);
+
+        if (m < n_moves) {
             tree_t child;
-            play_move(T, node->moves[i], &child);
-            send_task(env, node, node->moves[i], &child);
+            play_move(T, moves[m], &child);
+            MPI_Send(&child, 1, env->tree_type, status.MPI_SOURCE, TAG_TASK, MPI_COMM_WORLD);
+            *move = moves[m];
+            m++;
         }
     }
+
+    free(pmoves);
 }
 
 void evaluate(tree_t *T, result_t *result) {
@@ -261,10 +205,7 @@ void evaluate(tree_t *T, result_t *result) {
         tt_store(T, result);
 }
 
-void decide_master(Env* env, Node* root) {
-    tree_t* T = &root->T;
-    result_t* result = &root->result;
-
+void decide_master(Env* env, tree_t* T, result_t* result) {
     for (int depth = 1;; depth++) {
         T->depth = depth;
         T->height = 0;
@@ -272,13 +213,7 @@ void decide_master(Env* env, Node* root) {
         T->beta = MAX_SCORE + 1;
 
         printf("=====================================\n");
-        // TODO only if > env->depth?
-        evaluate_master(env, root);
-        task_barrier(env);
-        if (root->countdown != 0) {
-            printf("COUNTDOWN :/\n");
-            exit(EXIT_FAILURE);
-        }
+        evaluate_master(env, T, result);
 
         printf("depth: %d / score: %.2f / best_move : ", T->depth, 0.01 * result->score);
         print_pv(T, result);
@@ -413,22 +348,7 @@ int main(int argc, char **argv) {
     if (TRANSPOSITION_TABLE)
         init_tt();
    
-    int branching = 6;
-    if (ALPHA_BETA_PRUNING) {
-        if (TRANSPOSITION_TABLE) {
-            branching = 2;
-        } else {
-            branching = 4;
-        }
-    }
-
     if (e.rank == 0) {
-        e.active_workers = 0;
-        e.next_worker = 0;
-        e.task_count = 0;
-        e.worker_tasks = malloc((e.procs - 1) * sizeof(Task));
-        e.depth = log(18 * (e.procs - 1)) / log(branching);
-
         if (argc < 2) {
             printf("usage: %s \"4k//4K/4P w\" (or any position in FEN)\n", argv[0]);
             exit(1);
@@ -440,15 +360,15 @@ int main(int argc, char **argv) {
         if (TRANSPOSITION_TABLE)
             printf("Transposition table ENABLED\n");
 
-        Node root;
-        root.parent = NULL;
-        parse_FEN(argv[1], &root.T);
-        print_position(&root.T);
+        tree_t root;
+        parse_FEN(argv[1], &root);
+        print_position(&root);
 
-        decide_master(&e, &root);
+        result_t result;
+        decide_master(&e, &root, &result);
 
         printf("\nDécision de la position: ");
-        switch (root.result.score * (2 * root.T.side - 1)) {
+        switch (result.score * (2 * root.side - 1)) {
             case MAX_SCORE:
                 printf("blanc gagne\n");
                 break;
@@ -462,9 +382,8 @@ int main(int argc, char **argv) {
                 printf("BUG\n");
         }
 
-        printf("master down, task depth = %i, searched %llu nodes\n", e.depth, node_searched);
+        printf("master down, searched %llu nodes\n", node_searched);
         printf("execution time: %lf\n", seconds_from(&start));
-        free(e.worker_tasks);
     } else {
         MPI_Status status;
         tree_t tree;
